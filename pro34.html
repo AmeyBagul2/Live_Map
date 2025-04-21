@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mapbox GeoJSON Upload Viewer</title>
+
+  <!-- Mapbox CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+  <!-- Turf.js for bbox calculation -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    .upload-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+
+    .upload-panel input[type=file] {
+      display: block;
+      margin-top: 8px;
+    }
+
+    .upload-panel h4 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .popup-content ul {
+      padding-left: 20px;
+      margin: 4px 0;
+    }
+
+    .popup-content li {
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- GeoJSON Upload UI -->
+  <div class="upload-panel">
+    <h4>Upload GeoJSON File</h4>
+    <input type="file" id="geojsonFile" accept=".geojson,.json" />
+  </div>
+
+  <script>
+    // 🔑 Replace this with your own Mapbox Access Token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYW1leTAwNyIsImEiOiJjbTlmN2lnNjYxaGkxMmtzZ3h2MHZqNGZpIn0.ZwdR2azR6ihxDR8wy2kOvw';
+
+    // Initialize Map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [78.9629, 22.5937], // Default center (India)
+      zoom: 4
+    });
+
+    // Handle GeoJSON file upload
+    document.getElementById('geojsonFile').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const geojson = JSON.parse(e.target.result);
+
+        // Remove previous layer/source if already added
+        if (map.getLayer('custom-geojson-layer')) map.removeLayer('custom-geojson-layer');
+        if (map.getSource('custom-geojson')) map.removeSource('custom-geojson');
+
+        // Add GeoJSON as source
+        map.addSource('custom-geojson', {
+          type: 'geojson',
+          data: geojson
+        });
+
+        // Add Layer - customize based on geometry type
+        map.addLayer({
+          id: 'custom-geojson-layer',
+          type: 'fill', // Use 'line' or 'circle' if your data is Line/Point
+          source: 'custom-geojson',
+          paint: {
+            'fill-color': '#0080ff',
+            'fill-opacity': 0.5,
+            'fill-outline-color': '#003366'
+          }
+        });
+
+        // Add Popup on Click
+        map.on('click', 'custom-geojson-layer', (e) => {
+          const props = e.features[0].properties;
+          let html = '<div class="popup-content"><strong>Attributes:</strong><ul>';
+          for (let key in props) {
+            html += `<li><strong>${key}</strong>: ${props[key]}</li>`;
+          }
+          html += '</ul></div>';
+
+          new mapboxgl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        });
+
+        // Change cursor on hover
+        map.on('mouseenter', 'custom-geojson-layer', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'custom-geojson-layer', () => {
+          map.getCanvas().style.cursor = '';
+        });
+
+        // Zoom to layer bounds
+        const bbox = turf.bbox(geojson);
+        map.fitBounds(bbox, { padding: 40 });
+
+        console.log('GeoJSON loaded successfully:', geojson);
+      };
+
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mapbox Full Features App</title>
+
+  <!-- Mapbox CSS & Plugins -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.css" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.css" rel="stylesheet" />
+
+  <!-- Mapbox JS & Plugins -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.min.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    .mapboxgl-ctrl-geocoder {
+      min-width: 250px;
+      margin: 10px;
+    }
+
+    .mapboxgl-ctrl-top-left .mapboxgl-ctrl {
+      margin: 70px 80px 10px 10px;
+    }
+
+    .finish-drawing-btn {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      background: #ff9800;
+      padding: 10px;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .layer-toggle-btns {
+      position: absolute;
+      top: 550px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+    }
+
+    .layer-toggle-btns button {
+      background: #fff;
+      padding: 5px 10px;
+      margin: 5px;
+      border: none;
+      cursor: pointer;
+      border-radius: 3px;
+      font-size: 14px;
+    }
+
+    .layer-toggle-btns button:hover {
+      background: #0037ff;
+      color: white;
+    }
+
+    #toggle-directions-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    #add-marker-btn {
+      position: absolute;
+      top: 100px;
+      left: 10px; /* Adjust position to avoid overlap */
+      background: #4caf50;
+      padding: 10px;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    #terrain-toggle-btn {
+      position: absolute;
+      top: 160px; /* Adjusted to prevent overlap with other buttons */
+      left: 10px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!-- Drawing Finish Button -->
+  <button class="finish-drawing-btn" id="finish-drawing-btn">Finish Drawing</button>
+
+   <!-- Add a marker button -->
+   <button class="marker-btn" id="add-marker-btn">Add Marker</button>
+
+   <!-- Terrain Toggle Button -->
+   <button class="terrain-toggle-btn" id="terrain-toggle-btn">Toggle 3D Terrain</button>
+
+  <!-- Directions Toggle Button -->
+  <button id="toggle-directions-btn">🧭 Toggle Directions</button>
+
+  <!-- Layer Toggle Buttons -->
+  <div class="layer-toggle-btns">
+    <button onclick="setMapStyle('mapbox://styles/mapbox/streets-v11')">Street</button>
+    <button onclick="setMapStyle('mapbox://styles/mapbox/satellite-v9')">Satellite</button>
+    <button onclick="setMapStyle('mapbox://styles/mapbox/light-v10')">Light</button>
+    <button onclick="setMapStyle('mapbox://styles/mapbox/dark-v10')">Dark</button>
+  </div>
+
+  <script>
+    // Mapbox access token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYW1leTAwNyIsImEiOiJjbTlmN2lnNjYxaGkxMmtzZ3h2MHZqNGZpIn0.ZwdR2azR6ihxDR8wy2kOvw';
+  
+    let map, draw, directions, geocoder;
+    let directionsVisible = false;
+    let currentStyleUrl = 'mapbox://styles/mapbox/streets-v11'; // ✅ Track current style
+  
+    function initializeMap(styleUrl = currentStyleUrl) {
+      currentStyleUrl = styleUrl; // ✅ Update style reference
+  
+      // Remove previous map if exists
+      const container = document.getElementById('map');
+      if (container._mapInstance) {
+        container._mapInstance.remove();
+      }
+  
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: styleUrl,
+        center: [-74.5, 40],
+        zoom: 9
+      });
+  
+      container._mapInstance = map;
+  
+      // Controls
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  
+      geocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl,
+        placeholder: 'Search location...',
+        marker: false
+      });
+      map.addControl(geocoder, 'bottom-right');
+  
+      draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {
+          polygon: true,
+          line_string: true,
+          point: true,
+          trash: true
+        }
+      });
+      map.addControl(draw, 'bottom-left');
+  
+      map.on('draw.create', updateDrawnData);
+      map.on('draw.update', updateDrawnData);
+      map.on('draw.delete', () => console.log('Feature deleted'));
+  
+      if (directionsVisible) {
+        directions = new MapboxDirections({
+          accessToken: mapboxgl.accessToken,
+          unit: 'metric',
+          profile: 'mapbox/driving',
+          controls: { inputs: true, instructions: true }
+        });
+        map.addControl(directions, 'top-left');
+      }
+    }
+  
+    function updateDrawnData(e) {
+      const data = draw.getAll();
+      console.log('Drawn Features:', data);
+  
+      if (directionsVisible && directions) {
+        directions.setOrigin(null);
+        directions.setDestination(null);
+      }
+    }
+  
+    // Finish drawing button
+    document.getElementById('finish-drawing-btn').addEventListener('click', () => {
+      draw.changeMode('simple_select');
+      console.log('Finished Drawing:', draw.getAll());
+    });
+  
+    // ✅ Fixed: Toggle Directions Button
+    document.getElementById('toggle-directions-btn').addEventListener('click', () => {
+      directionsVisible = !directionsVisible;
+      initializeMap(currentStyleUrl); // ✅ Use tracked style
+    });
+
+     // Add Point Marker Logic
+    const addMarkerBtn = document.getElementById('add-marker-btn');
+
+    // Add marker on click of the button
+    addMarkerBtn.addEventListener('click', function () {
+      const marker = new mapboxgl.Marker()
+        .setLngLat([-74.5, 40]) // Set marker at coordinates (Longitude, Latitude)
+        .addTo(map);
+
+      // Add Popup to the marker
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML('<h3>Marker Location</h3><p>This is a marker!</p>');
+        
+      marker.setPopup(popup);
+
+      // Show popup when the marker is clicked
+      marker.getElement().addEventListener('click', function () {
+        popup.addTo(map);
+      });
+    });
+  
+    // 3D Terrain Toggle Logic
+    let is3D = false;
+    const terrainToggleBtn = document.getElementById('terrain-toggle-btn');
+
+    terrainToggleBtn.addEventListener('click', function () {
+      if (is3D) {
+        // Switch to 2D view
+        map.easeTo({
+          pitch: 0,
+          duration: 1000
+        });
+        is3D = false;
+      } else {
+        // Switch to 3D view
+        map.easeTo({
+          pitch: 45, // Set pitch for 3D effect
+          duration: 1000
+        });
+        is3D = true;
+      }
+    });
+
+    function setMapStyle(styleUrl) {
+      currentStyleUrl = styleUrl;
+      initializeMap(styleUrl); // Re-initialize the map with new style
+    }
+
+    // Initialize map on load
+    window.onload = initializeMap;
+  </script>
+</body>
+</html>

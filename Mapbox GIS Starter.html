@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapbox GIS Starter</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .btn {
+      display: block;
+      margin-bottom: 5px;
+      padding: 5px 10px;
+      background-color: #1d72b8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #155b96;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="controls">
+    <button class="btn" id="toggle-layer">Toggle Earthquakes</button>
+  </div>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script>
+    // Access Token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYW1leTAwNyIsImEiOiJjbTlmN2lnNjYxaGkxMmtzZ3h2MHZqNGZpIn0.ZwdR2azR6ihxDR8wy2kOvw';
+
+    // Initialize Map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-98.5, 39.8],
+      zoom: 3
+    });
+
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Lazy-loaded dynamic data layer (for optimization)
+    function loadDynamicData(bounds) {
+      const bbox = bounds.toArray().flat().join(',');
+      fetch(`https://api.example.com/data?bbox=${bbox}`) // replace with real API
+        .then(res => res.json())
+        .then(data => {
+          if (map.getSource('dynamic')) {
+            map.getSource('dynamic').setData(data);
+          } else {
+            map.addSource('dynamic', {
+              type: 'geojson',
+              data: data
+            });
+            map.addLayer({
+              id: 'dynamic-layer',
+              type: 'circle',
+              source: 'dynamic',
+              paint: {
+                'circle-color': '#f00',
+                'circle-radius': 5
+              }
+            });
+          }
+        });
+    }
+
+    // Cluster source and layer setup
+    function addClusteredLayer() {
+      map.addSource('earthquakes', {
+        type: 'geojson',
+        data: 'https://docs.mapbox.com/mapbox-gl-js/assets/earthquakes.geojson',
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50
+      });
+
+      map.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'earthquakes',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': ['step', ['get', 'point_count'], '#51bbd6', 100, '#f1f075', 750, '#f28cb1'],
+          'circle-radius': ['step', ['get', 'point_count'], 20, 100, 30, 750, 40]
+        }
+      });
+
+      map.addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'earthquakes',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': ['get', 'point_count_abbreviated'],
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 12
+        }
+      });
+
+      map.addLayer({
+        id: 'unclustered-point',
+        type: 'circle',
+        source: 'earthquakes',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': '#11b4da',
+          'circle-radius': 6,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#fff'
+        }
+      });
+    }
+
+    map.on('load', () => {
+      addClusteredLayer();
+      loadDynamicData(map.getBounds());
+    });
+
+    map.on('moveend', () => {
+      loadDynamicData(map.getBounds());
+    });
+
+    // Layer toggle button
+    const toggleBtn = document.getElementById('toggle-layer');
+    let visible = true;
+    toggleBtn.addEventListener('click', () => {
+      visible = !visible;
+      map.setLayoutProperty('clusters', 'visibility', visible ? 'visible' : 'none');
+      map.setLayoutProperty('cluster-count', 'visibility', visible ? 'visible' : 'none');
+      map.setLayoutProperty('unclustered-point', 'visibility', visible ? 'visible' : 'none');
+    });
+  </script>
+</body>
+</html>

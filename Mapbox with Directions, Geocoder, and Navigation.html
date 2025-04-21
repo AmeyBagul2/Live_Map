@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mapbox Toggle Directions</title>
+
+  <!-- Mapbox CSS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.css" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
+
+  <!-- Mapbox JS -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.min.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    #toggleBtn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+      background: white;
+      padding: 8px 14px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .mapboxgl-ctrl-top-left .mapboxgl-ctrl {
+      margin: 70px 10px 10px 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!-- 👇 Toggle button -->
+  <button id="toggleBtn">🧭 Toggle Directions</button>
+
+  <script>
+    // Set access token
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYW1leTAwNyIsImEiOiJjbTlmN2lnNjYxaGkxMmtzZ3h2MHZqNGZpIn0.ZwdR2azR6ihxDR8wy2kOvw';
+
+    // Initialize the map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-74.5, 40],
+      zoom: 9
+    });
+
+    // Add zoom controls
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add search (geocoder)
+    const geocoder = new MapboxGeocoder({
+      accessToken: mapboxgl.accessToken,
+      mapboxgl: mapboxgl,
+      marker: false,
+      placeholder: '         Search location...',
+    });
+    map.addControl(geocoder, 'top-right');
+
+    // Create Directions object
+    const directions = new MapboxDirections({
+      accessToken: mapboxgl.accessToken,
+      unit: 'metric',
+      profile: 'mapbox/driving',
+      interactive: true,
+      controls: {
+        inputs: true,
+        instructions: true
+      }
+    });
+
+    // Track whether directions is active
+    let directionsActive = false;
+
+    // Toggle directions on/off
+    document.getElementById('toggleBtn').addEventListener('click', () => {
+      if (!directionsActive) {
+        map.addControl(directions, 'top-left');
+        directionsActive = true;
+      } else {
+        map.removeControl(directions);
+        directionsActive = false;
+      }
+    });
+  </script>
+
+</body>
+</html>
